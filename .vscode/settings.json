@@ -1,0 +1,11 @@
+{
+    "files.associations": {
+        "*.rmd": "markdown",
+        "io.h": "c",
+        "iotn45.h": "c",
+        "iotnx5.h": "c",
+        "delay.h": "c",
+        "xmega.h": "c",
+        "tc_io.h": "c"
+    }
+}
