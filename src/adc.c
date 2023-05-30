@@ -125,3 +125,14 @@ uint16_t tc_adc_read(void)
     while(!tc_adc_conversion_finished());
     return tc_adc_get_result();
 }
+
+uint16_t tc_adc_read_iterative(size_t cnt_iter)
+{
+    uint16_t initial = 0;
+    for(size_t i = 0; i < cnt_iter; ++i)
+    {
+        initial += tc_adc_read();
+    }
+    initial = initial / cnt_iter;
+    return initial;
+}

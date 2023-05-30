@@ -33,6 +33,7 @@
 
 #include <avr/io.h>
 #include <stdbool.h>
+#include <stdio.h>
 #include "tc_io.h"
 
 typedef enum
@@ -54,3 +55,4 @@ void tc_adc_start_conversion(void);
 bool tc_adc_conversion_finished(void);
 uint16_t tc_adc_get_result(void);
 uint16_t tc_adc_read(void);
+uint16_t tc_adc_read_iterative(size_t cnt_iter);

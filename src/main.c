@@ -44,21 +44,22 @@ int main(void)
   OCR1C = TC_OC1C;
 
   tc_adc_set_input_ch(TC_VSOURCE_PIN);
+  Vsource = tc_adc_read_iterative(TC_ADC_NUM_ITER);
 
-  uint16_t Vinitial = 0;
-  
-  for(uint8_t i = 0; i < TC_ADC_NUM_ITER; ++i)
-  {
-    Vinitial += tc_adc_read();
-  }
-  Vinitial = Vinitial / TC_ADC_NUM_ITER;
-
-  OCR1B = (uint8_t)(TC_ADC_VALUE_VSS * TC_OC1C / Vinitial + TC_OUTPUT_DEFAULT_BIAS);
+  OCR1B = (uint8_t)(TC_CONVERTER_VREF * TC_OC1C / Vsource + TC_OUTPUT_DEFAULT_BIAS);
 
   tc_tim1_enable_pwm(TC_PWM_B);
 
-  // Wait 100ms for the output voltage to stabilize
-  _delay_ms(100);
+  _delay_ms(120);
+
+  tc_adc_set_input_ch(TC_VSOURCE_PIN);
+  Vsource = tc_adc_read_iterative(TC_ADC_NUM_ITER);
+
+  tc_adc_set_input_ch(TC_VOUT_PIN);
+  Vfeedback = tc_adc_read_iterative(TC_ADC_NUM_ITER);
+
+  uint32_t dr = ((2UL * (uint32_t)TC_CONVERTER_VREF - (uint32_t)Vfeedback) * (uint32_t)TC_OC1C) / (uint32_t)Vsource;
+  OCR1B = (uint8_t)dr + tc_get_adjusted_bias(Vsource,Vfeedback);
 
   while (1)
   {
@@ -68,12 +69,7 @@ int main(void)
     tc_adc_set_input_ch(TC_VOUT_PIN);
 
     // Iterate ADC readings and average out
-    uint16_t Vfeedback_last = 0;
-    for(uint8_t i = 0; i < TC_ADC_NUM_ITER; ++i)
-    {
-      Vfeedback_last += tc_adc_read();
-    }
-    Vfeedback_last = Vfeedback_last / TC_ADC_NUM_ITER;
+    uint16_t Vfeedback_last = tc_adc_read_iterative(TC_ADC_NUM_ITER);
     /*---------------------------------------------------------*/
 
 
@@ -83,12 +79,7 @@ int main(void)
     tc_adc_set_input_ch(TC_VSOURCE_PIN);
     
     // Iterate ADC readings and average out
-    uint16_t Vsource_last = 0;
-    for(uint8_t i = 0; i < TC_ADC_NUM_ITER; ++i)
-    {
-      Vsource_last += tc_adc_read();
-    }
-    Vsource_last = Vsource_last / TC_ADC_NUM_ITER;
+    uint16_t Vsource_last = tc_adc_read_iterative(TC_ADC_NUM_ITER);
     /*--------------------------------------------------------*/
 
     int delta_Vsource = abs(Vsource_last - Vsource);
@@ -96,28 +87,22 @@ int main(void)
 
     bool Vsource_changed = delta_Vsource > TC_VSOURCE_HYSTERESIS_THRESHOLD;
     bool Vfeedback_changed = delta_Vfeedback > TC_VOUT_HYSTERESIS_THRESHOLD;
-    // Causes oscillations
-    //bool needs_reevaluation = reevaluate_Vout_counter > TC_REEVALUATE_VOUT_IF_GREATER;
 
     if (Vsource_changed || Vfeedback_changed)
     {
-      //reevaluate_Vout_counter = 0;
 
       if (Vsource_changed)  Vsource = Vsource_last;
       if (Vfeedback_changed)  Vfeedback = Vfeedback_last;
 
-      uint32_t calc_duty_cycle = ((2UL * (uint32_t)TC_ADC_VALUE_VSS - (uint32_t)Vfeedback_last) * (uint32_t)TC_OC1C) / (uint32_t)Vsource_last;
+      uint32_t calc_duty_cycle = ((2UL * (uint32_t)TC_CONVERTER_VREF - (uint32_t)Vfeedback_last) * (uint32_t)TC_OC1C) / (uint32_t)Vsource_last;
 
       // Add the bias
-      duty_cycle = (uint8_t)calc_duty_cycle + tc_get_dynamic_bias(Vsource_last,Vfeedback_last);
+      duty_cycle = (uint8_t)calc_duty_cycle + tc_get_adjusted_bias(Vsource_last,Vfeedback_last);
 
       // Finally, set the timer value to the duty cycle(w.r.t to OC1C)
       OCR1B = duty_cycle;
     }
-    else
-    {
-      //++reevaluate_Vout_counter;
-    }
-    _delay_ms(1);
+  
+    _delay_ms(100);
   }
 }
